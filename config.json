@@ -1,18 +1,18 @@
 {
   "cooldownMs": 0,
-  "volume": 1.0,
+  "volume": 1.6,
   "rules": [
     {
       "name": "胖哥",
       "userId": "1407892120",
       "sound": "sounds/pange.mp3",
-      "volume": 1.0
+      "volume": 1.6
     },
     {
       "name": "我（测试）",
       "userId": "414517557",
       "sound": "sounds/pange.mp3",
-      "volume": 1.0
+      "volume": 1.6
     }
   ]
 }
