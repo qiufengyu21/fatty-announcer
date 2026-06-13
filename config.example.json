@@ -1,0 +1,18 @@
+{
+  "cooldownMs": 8000,
+  "volume": 1.0,
+  "rules": [
+    {
+      "name": "老王",
+      "userId": "2418200000",
+      "channelId": "9219038000000",
+      "sound": "sounds/special.mp3",
+      "volume": 1.0
+    },
+    {
+      "name": "任意频道都触发的示例",
+      "userId": "3891600000",
+      "sound": "sounds/another.mp3"
+    }
+  ]
+}

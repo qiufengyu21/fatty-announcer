@@ -1,0 +1,9 @@
+# 依赖与编译产物（在 VM 上重新生成）
+node_modules/
+dist/
+
+# 机密：机器人 Token 绝不提交！
+.env
+
+# 日志
+*.log

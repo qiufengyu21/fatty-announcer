@@ -1,0 +1,169 @@
+# KOOK 语音音效机器人
+
+一个简单的 KOOK（开黑啦）机器人：**当某个特定的人进入指定的语音频道时，自动加入该频道播放一段你自定义的音效，然后离开。**
+
+- 监听 KOOK Websocket 网关的「用户加入语音频道」事件（`joined_channel`）
+- 命中你配置的「用户 + 频道」规则时，调用语音接口加入频道
+- 用 `ffmpeg` 把你的音效以 opus 编码通过 RTP 推流播放，播完自动离开
+- 支持多条规则、每条规则独立音效与音量、触发冷却时间
+
+---
+
+## 一、准备工作
+
+### 1. 安装 Node.js
+
+需要 **Node.js 18 或更高版本**（自带 `fetch`）。在终端执行 `node -v` 确认版本。
+
+### 2. ffmpeg
+
+音效推流依赖 `ffmpeg`（且需支持 `libopus`）。本项目默认会自动安装内置的 `ffmpeg-static`，**通常你不需要手动装**。
+
+如果你的网络无法下载 `ffmpeg-static`，可以改用系统的 ffmpeg：
+- 自行安装 ffmpeg 并加入 PATH，或
+- 在 `.env` 里设置 `FFMPEG_PATH` 指向 ffmpeg 可执行文件。
+
+### 3. 创建机器人并拿到 Token
+
+1. 打开 [KOOK 开发者中心](https://developer.kookapp.cn/app/index)，创建一个应用。
+2. 进入应用的「机器人」页面，**连接模式选择 `Websocket`**。
+3. 复制 **Token**（形如 `1/MTA4O...=/xxxx==`）。
+4. 在「机器人」页面把机器人**邀请/添加到你的服务器**。
+5. 确保机器人在目标语音频道有 **连接语音 / 说话** 权限（否则无法推流）。
+
+### 4. 获取「用户 ID」和「频道 ID」
+
+在 KOOK 客户端里打开 **设置 → 高级设置 → 开发者模式**，然后：
+- 右键某个用户头像 → **复制 ID** → 得到 `userId`
+- 右键某个语音频道 → **复制 ID** → 得到 `channelId`
+
+> 小技巧：直接启动机器人后，**任何人进入语音频道**时，控制台都会打印
+> `用户加入语音频道：user_id=xxx channel_id=yyy`，照着填进配置即可。
+
+---
+
+## 二、安装与配置
+
+在项目根目录（`d:\Projects\kook-bot`）依次执行：
+
+```powershell
+# 1. 安装依赖
+npm install
+
+# 2. 准备配置文件
+Copy-Item .env.example .env
+Copy-Item config.example.json config.json
+```
+
+然后编辑两个文件：
+
+**`.env`** —— 填入机器人 Token：
+
+```ini
+KOOK_BOT_TOKEN=你的机器人Token
+```
+
+**`config.json`** —— 配置触发规则：
+
+```json
+{
+  "cooldownMs": 8000,
+  "volume": 1.0,
+  "rules": [
+    {
+      "name": "老王",
+      "userId": "2418200000",
+      "channelId": "9219038000000",
+      "sound": "sounds/special.mp3",
+      "volume": 1.0
+    }
+  ]
+}
+```
+
+字段说明：
+
+| 字段 | 必填 | 说明 |
+| --- | --- | --- |
+| `userId` | 是 | 目标用户的 ID |
+| `channelId` | 否 | 目标语音频道 ID；**留空 / 不写** 表示该用户进入任意语音频道都会触发 |
+| `sound` | 是 | 音效文件路径，相对项目根目录，例如 `sounds/special.mp3` |
+| `name` | 否 | 仅用于日志显示的名称 |
+| `volume` | 否 | 该规则单独音量，`1` 为原始音量，`0.8` 更轻，`1.5` 更响 |
+| `cooldownMs` | 否 | 顶层字段，同一用户在同一频道两次触发的最小间隔（毫秒），默认 8000 |
+| `volume`（顶层） | 否 | 全局默认音量，默认 `1.0` |
+
+最后，把你的音效文件放进 `sounds/` 目录（见 [sounds/README.md](sounds/README.md)）。
+
+---
+
+## 三、运行
+
+```powershell
+npm start
+```
+
+看到日志 `机器人已启动，正在监听语音频道加入事件。` 即表示成功。
+
+此时让目标用户进入对应语音频道，机器人会自动加入并播放音效。按 `Ctrl+C` 退出。
+
+> 想让它一直在后台运行，可使用 `pm2`、Windows 计划任务，或放到服务器上跑。
+
+---
+
+## 四、工作原理
+
+```
+用户进入语音频道
+        │  KOOK 推送 joined_channel 事件
+        ▼
+   Websocket 网关  ──►  匹配规则（userId + channelId）
+        │
+        ▼
+  POST /api/v3/voice/join      取得媒体服务器 ip/port/ssrc 等
+        │
+        ▼
+  ffmpeg 以 opus + RTP 推流播放音效
+        │
+        ▼
+  POST /api/v3/voice/leave     播完离开，释放资源
+```
+
+源码结构：
+
+| 文件 | 作用 |
+| --- | --- |
+| [src/index.ts](src/index.ts) | 入口：装配各模块、匹配规则、冷却控制 |
+| [src/config.ts](src/config.ts) | 读取并校验 `.env` 与 `config.json` |
+| [src/kook-api.ts](src/kook-api.ts) | KOOK HTTP 接口封装（网关地址、语音加入/离开） |
+| [src/gateway.ts](src/gateway.ts) | Websocket 网关：握手、心跳、断线重连、resume |
+| [src/voice-player.ts](src/voice-player.ts) | 串行播放队列 + ffmpeg 推流 |
+| [src/ffmpeg.ts](src/ffmpeg.ts) | 解析 ffmpeg 可执行文件路径 |
+
+---
+
+## 五、常见问题
+
+**Q：机器人没反应，控制台也没有「用户加入语音频道」日志？**
+- 确认机器人连接模式是 `Websocket` 且 Token 正确。
+- 确认机器人已加入该服务器，并能看到该语音频道。
+
+**Q：日志报 `无法启动 ffmpeg`？**
+- 说明没找到 ffmpeg。保留 `ffmpeg-static` 依赖（重新 `npm install`），或在 `.env` 设置 `FFMPEG_PATH`。
+
+**Q：报 ffmpeg 退出码非 0，提示 opus 相关错误？**
+- 你的 ffmpeg 不支持 `libopus`。建议改用内置 `ffmpeg-static`，它已包含 libopus。
+
+**Q：加入语音失败 / 偶发报错？**
+- KOOK 限制同一时间只能加入一个语音房间，离开后需等待 2~3 秒再加入（本项目已自动处理）。
+- 确认机器人在该语音频道有「连接语音/说话」权限。
+
+**Q：能同时监听多个用户 / 多个频道吗？**
+- 可以，在 `rules` 数组里添加多条规则即可。任务会自动排队、逐个播放。
+
+---
+
+## 六、安全提示
+
+- `.env` 内含机器人 Token，**切勿泄露或提交到公共仓库**（已在 `.gitignore` 忽略）。
+- 若 Token 泄露，请到开发者中心**重置 Token**。
