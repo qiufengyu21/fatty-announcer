@@ -18,7 +18,7 @@ const LEAVE_COOLDOWN_MS = 2500;
 // ffmpeg 推流的最大时长保护，防止异常情况下进程挂死。
 const FFMPEG_MAX_MS = 120_000;
 // 在音效前垫一段静音，避免机器人刚进频道、语音通道尚未建立好时吞掉开头几个字。
-const LEAD_IN_SILENCE_MS = 1500;
+const LEAD_IN_SILENCE_MS = 2500;
 
 /**
  * 语音播放器：维护一个串行队列，逐个处理「加入频道 -> 推流音效 -> 离开频道」。
