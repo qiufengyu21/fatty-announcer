@@ -1,7 +1,7 @@
 {
-  "name": "kook-voice-sfx-bot",
+  "name": "fatty-announcer",
   "version": "1.0.0",
-  "description": "KOOK 机器人：当特定用户进入指定语音频道时，自动播放自定义音效",
+  "description": "KOOK 机器人：当特定用户进入语音频道时，自动播放自定义音效",
   "type": "module",
   "engines": {
     "node": ">=18"
