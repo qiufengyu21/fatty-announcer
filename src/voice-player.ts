@@ -17,8 +17,12 @@ export interface PlayJob {
 const LEAVE_COOLDOWN_MS = 2500;
 // ffmpeg 推流的最大时长保护，防止异常情况下进程挂死。
 const FFMPEG_MAX_MS = 120_000;
-// 在音效前垫一段静音，避免机器人刚进频道、语音通道尚未建立好时吞掉开头几个字。
-const LEAD_IN_SILENCE_MS = 2500;
+// 加入频道后，先等 KOOK 把机器人的语音通道路由到其他客户端，再开始推流。
+// 这是真实的墙上时钟等待，才是修复「开头被吞」的关键——在音频里垫静音没用，
+// 因为 ffmpeg 会把 adelay 静音瞬间灌完，并不占用真实时间。
+const JOIN_SETTLE_MS = 2000;
+// 在音效前再垫一小段静音作为额外保险（占真实时间很短，几乎无感）。
+const LEAD_IN_SILENCE_MS = 250;
 
 /**
  * 语音播放器：维护一个串行队列，逐个处理「加入频道 -> 推流音效 -> 离开频道」。
@@ -66,8 +70,10 @@ export class VoicePlayer {
       throw new Error(`音效文件不存在：${soundPath}`);
     }
 
-    log.info(`触发：${job.label} -> 加入频道 ${job.channelId} 播放音效（前置静音 ${LEAD_IN_SILENCE_MS}ms，音量 ${job.volume}）`);
+    log.info(`触发：${job.label} -> 加入频道 ${job.channelId} 播放音效（通道就绪等待 ${JOIN_SETTLE_MS}ms，音量 ${job.volume}）`);
     const info = await this.api.joinVoice(job.channelId);
+    // 关键修复：加入后先等待语音通道在各客户端建立完成，再推流，否则会吞掉开头几个字。
+    await delay(JOIN_SETTLE_MS);
     await this.stream(info, soundPath, job.volume);
     log.info('音效播放完成，离开频道。');
     await this.api.leaveVoice(job.channelId);
