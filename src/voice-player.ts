@@ -66,7 +66,7 @@ export class VoicePlayer {
       throw new Error(`音效文件不存在：${soundPath}`);
     }
 
-    log.info(`触发：${job.label} -> 加入频道 ${job.channelId} 播放音效`);
+    log.info(`触发：${job.label} -> 加入频道 ${job.channelId} 播放音效（前置静音 ${LEAD_IN_SILENCE_MS}ms，音量 ${job.volume}）`);
     const info = await this.api.joinVoice(job.channelId);
     await this.stream(info, soundPath, job.volume);
     log.info('音效播放完成，离开频道。');
