@@ -7,6 +7,12 @@
       "userId": "1407892120",
       "sound": "sounds/pange.mp3",
       "volume": 1.0
+    },
+    {
+      "name": "我（测试）",
+      "userId": "414517557",
+      "sound": "sounds/pange.mp3",
+      "volume": 1.0
     }
   ]
 }
