@@ -133,7 +133,7 @@ bash deploy/setup.sh
 常用命令：
 
 ```bash
-sudo systemctl status kook-bot      # 查看状态
+sudo systemctl status kook-bot      # 查看状态（含内存占用 Memory: 一行）
 journalctl -u kook-bot -f           # 实时日志
 sudo systemctl restart kook-bot     # 重启
 sudo systemctl stop kook-bot        # 停止
@@ -141,16 +141,77 @@ sudo systemctl stop kook-bot        # 停止
 
 服务配置了 `Restart=always` 与开机自启：进程崩溃会自动拉起，服务器重启后也会自动恢复。
 
-### 更新代码 / 音效
+### 查看内存 / 资源占用
+
+机器人以 systemd 服务运行，可直接查它的内存占用：
+
+```bash
+# 方式一：状态里直接看 Memory: 一行（最直观）
+sudo systemctl status kook-bot --no-pager | grep Memory
+
+# 方式二：只取当前内存字节数
+sudo systemctl show kook-bot --property=MemoryCurrent
+
+# 方式三：实时刷新（按内存排序，q 退出）
+systemd-cgtop
+```
+
+> 这是个 Node 进程，常驻内存通常在几十 MB 量级；播放音效时会临时拉起 ffmpeg 子进程，结束后释放。
+
+### 更新 / 部署新功能（已部署后）
+
+在本地改完代码、提交并 `git push` 后，到服务器上执行以下步骤拉取并重新部署：
 
 ```bash
 cd ~/fatty-announcer
 git pull
 npm run build          # 已内置自动清理 dist，无需手动 rm
 sudo systemctl restart kook-bot
+journalctl -u kook-bot -f   # 看日志确认「已加载 N 条规则」并正常启动
+```
+
+懒人一行版（在项目目录里直接跑）：
+
+```bash
+git pull && npm run build && sudo systemctl restart kook-bot
 ```
 
 > `npm run build` 会先 `clean`（删除旧 `dist/`）再用 `tsc` 全新编译，确保运行的是最新代码。
+
+**如果 `git pull` 报 “divergent branches”（分支分叉）怎么办？**
+
+当本地用过 `git commit --amend` 或 `git push --force`（改写了历史）后，服务器上的本地分支会和远端分叉。由于服务器上的代码不需要本地改动，直接让本地对齐远端即可：
+
+```bash
+git status                 # 先确认没有要保留的本地改动（应显示 working tree clean）
+git reset --hard origin/main
+```
+
+> `git reset --hard` 会丢弃所有未提交的本地改动，执行前务必先 `git status` 确认干净。
+> 想一劳永逸避免分叉提示，可设一次默认：`git config pull.ff only`。
+
+### 测试新功能（临时规则）
+
+`config.json` 是 JSON 格式、**不支持注释**，所以测试规则没法“注释保留”在文件里。需要测试时，把下面这两条规则临时粘进 `config.json` 的 `rules` 数组（测试账号 `414517557`），重启服务即可用自己的账号触发进/出音效；测完删掉这两条再重启：
+
+```json
+    {
+      "name": "测试-我进入",
+      "userId": "414517557",
+      "event": "joined",
+      "sound": "sounds/pange-join.mp3",
+      "volume": 1.6
+    },
+    {
+      "name": "测试-我离开",
+      "userId": "414517557",
+      "event": "exited",
+      "sound": "sounds/pange-leave.mp3",
+      "volume": 1.6
+    }
+```
+
+> 提示：`config.json` 不需要改代码、不参与编译，改完只要 `sudo systemctl restart kook-bot` 重启即可生效，无需 `npm run build`。
 
 ---
 

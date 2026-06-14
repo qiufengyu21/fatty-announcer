@@ -15,20 +15,6 @@
       "event": "exited",
       "sound": "sounds/pange-leave.mp3",
       "volume": 1.6
-    },
-    {
-      "name": "测试-我进入",
-      "userId": "414517557",
-      "event": "joined",
-      "sound": "sounds/pange-join.mp3",
-      "volume": 1.6
-    },
-    {
-      "name": "测试-我离开",
-      "userId": "414517557",
-      "event": "exited",
-      "sound": "sounds/pange-leave.mp3",
-      "volume": 1.6
     }
   ]
 }
