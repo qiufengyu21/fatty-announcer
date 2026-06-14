@@ -1,11 +1,15 @@
-# KOOK 语音音效机器人
+# fatty-announcer · KOOK 语音音效机器人
 
-一个简单的 KOOK（开黑啦）机器人：**当某个特定的人进入指定的语音频道时，自动加入该频道播放一段你自定义的音效，然后离开。**
+一个 KOOK（开黑啦）机器人：**当某个特定的人进入语音频道时，自动加入该频道播放一段你自定义的音效，然后离开。**
 
 - 监听 KOOK Websocket 网关的「用户加入语音频道」事件（`joined_channel`）
-- 命中你配置的「用户 + 频道」规则时，调用语音接口加入频道
+- 命中你配置的「用户（可选：+ 频道）」规则时，调用语音接口加入频道
 - 用 `ffmpeg` 把你的音效以 opus 编码通过 RTP 推流播放，播完自动离开
-- 支持多条规则、每条规则独立音效与音量、触发冷却时间
+- 支持多条规则、每条规则独立音效与音量、可选触发冷却
+- 串行队列：同一时间只在一个频道播放，多人同时进入会自动排队逐个播放
+- 加入后先等语音通道在各端建立完成再推流，避免开头几个字被吞
+
+> 说明：仓库名为 `fatty-announcer`；本机器人长期部署在一台 Linux 服务器上，以 systemd 服务（`kook-bot`）方式常驻运行。
 
 ---
 
@@ -67,15 +71,14 @@ KOOK_BOT_TOKEN=你的机器人Token
 
 ```json
 {
-  "cooldownMs": 8000,
-  "volume": 1.0,
+  "cooldownMs": 0,
+  "volume": 1.6,
   "rules": [
     {
-      "name": "老王",
-      "userId": "2418200000",
-      "channelId": "9219038000000",
-      "sound": "sounds/special.mp3",
-      "volume": 1.0
+      "name": "胖哥",
+      "userId": "1407892120",
+      "sound": "sounds/pange.mp3",
+      "volume": 1.6
     }
   ]
 }
@@ -90,24 +93,55 @@ KOOK_BOT_TOKEN=你的机器人Token
 | `sound` | 是 | 音效文件路径，相对项目根目录，例如 `sounds/special.mp3` |
 | `name` | 否 | 仅用于日志显示的名称 |
 | `volume` | 否 | 该规则单独音量，`1` 为原始音量，`0.8` 更轻，`1.5` 更响 |
-| `cooldownMs` | 否 | 顶层字段，同一用户在同一频道两次触发的最小间隔（毫秒），默认 8000 |
+| `cooldownMs` | 否 | 顶层字段，同一用户在同一频道两次触发的最小间隔（毫秒），`0` 表示无冷却；默认 8000 |
 | `volume`（顶层） | 否 | 全局默认音量，默认 `1.0` |
 
-最后，把你的音效文件放进 `sounds/` 目录（见 [sounds/README.md](sounds/README.md)）。
+最后，把你的音效文件放进 `sounds/` 目录。你也可以用免费的 `edge-tts` 在本地生成（含东北话、陕西话、粤语等方言音色），详见 [sounds/README.md](sounds/README.md)。
 
 ---
 
 ## 三、运行
 
+### 本地运行（开发 / 测试）
+
 ```powershell
 npm start
 ```
 
-看到日志 `机器人已启动，正在监听语音频道加入事件。` 即表示成功。
+看到日志 `机器人已启动，正在监听语音频道加入事件。` 即表示成功。让目标用户进入语音频道，机器人会自动加入并播放音效。按 `Ctrl+C` 退出。
 
-此时让目标用户进入对应语音频道，机器人会自动加入并播放音效。按 `Ctrl+C` 退出。
+### 在服务器上长期运行（systemd，推荐）
 
-> 想让它一直在后台运行，可使用 `pm2`、Windows 计划任务，或放到服务器上跑。
+项目自带一键部署脚本 [deploy/setup.sh](deploy/setup.sh)：在 Linux（Debian/Ubuntu）服务器上安装 Node、编译，并注册为开机自启的 systemd 服务（服务名 `kook-bot`）。
+
+```bash
+# 首次部署（在服务器上、项目根目录执行）
+# 前提：已准备好 .env 与 config.json，sounds/ 下有音效文件
+sed -i 's/\r$//' deploy/setup.sh   # 若脚本从 Windows 拷来，先去掉 CRLF
+bash deploy/setup.sh
+```
+
+常用命令：
+
+```bash
+sudo systemctl status kook-bot      # 查看状态
+journalctl -u kook-bot -f           # 实时日志
+sudo systemctl restart kook-bot     # 重启
+sudo systemctl stop kook-bot        # 停止
+```
+
+服务配置了 `Restart=always` 与开机自启：进程崩溃会自动拉起，服务器重启后也会自动恢复。
+
+### 更新代码 / 音效
+
+```bash
+cd ~/fatty-announcer
+git pull
+npm run build          # 已内置自动清理 dist，无需手动 rm
+sudo systemctl restart kook-bot
+```
+
+> `npm run build` 会先 `clean`（删除旧 `dist/`）再用 `tsc` 全新编译，确保运行的是最新代码。
 
 ---
 
@@ -137,8 +171,10 @@ npm start
 | [src/config.ts](src/config.ts) | 读取并校验 `.env` 与 `config.json` |
 | [src/kook-api.ts](src/kook-api.ts) | KOOK HTTP 接口封装（网关地址、语音加入/离开） |
 | [src/gateway.ts](src/gateway.ts) | Websocket 网关：握手、心跳、断线重连、resume |
-| [src/voice-player.ts](src/voice-player.ts) | 串行播放队列 + ffmpeg 推流 |
+| [src/voice-player.ts](src/voice-player.ts) | 串行播放队列、加入后等待通道就绪、ffmpeg 推流 |
 | [src/ffmpeg.ts](src/ffmpeg.ts) | 解析 ffmpeg 可执行文件路径 |
+| [src/types.ts](src/types.ts) | 类型定义（规则、配置、语音加入结果等） |
+| [src/logger.ts](src/logger.ts) | 带时间戳的日志输出 |
 
 ---
 
@@ -158,8 +194,8 @@ npm start
 - KOOK 限制同一时间只能加入一个语音房间，离开后需等待 2~3 秒再加入（本项目已自动处理）。
 - 确认机器人在该语音频道有「连接语音/说话」权限。
 
-**Q：能同时监听多个用户 / 多个频道吗？**
-- 可以，在 `rules` 数组里添加多条规则即可。任务会自动排队、逐个播放。
+**Q：能同时监听多个用户 / 多个频道吗？两人同时进来会怎样？**
+- 可以，在 `rules` 数组里添加多条规则即可。机器人是单一账号，同一时间只能在一个语音频道；多个触发会自动排队、逐个播放，不会冲突也不会丢，只是靠后的会稍晚一点。
 
 ---
 

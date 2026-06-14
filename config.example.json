@@ -1,18 +1,19 @@
 {
-  "cooldownMs": 8000,
-  "volume": 1.0,
+  "cooldownMs": 0,
+  "volume": 1.6,
   "rules": [
     {
-      "name": "老王",
-      "userId": "2418200000",
-      "channelId": "9219038000000",
-      "sound": "sounds/special.mp3",
-      "volume": 1.0
+      "name": "某人（进入任意语音频道都触发）",
+      "userId": "在此填用户ID",
+      "sound": "sounds/pange.mp3",
+      "volume": 1.6
     },
     {
-      "name": "任意频道都触发的示例",
-      "userId": "3891600000",
-      "sound": "sounds/another.mp3"
+      "name": "另一个人（仅在指定频道触发，使用独立音效与音量）",
+      "userId": "在此填另一个用户ID",
+      "channelId": "在此填语音频道ID（删掉本行=任意频道都触发）",
+      "sound": "sounds/another.mp3",
+      "volume": 1.4
     }
   ]
 }
