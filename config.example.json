@@ -3,9 +3,16 @@
   "volume": 1.6,
   "rules": [
     {
-      "name": "某人（进入任意语音频道都触发）",
+      "name": "某人进入任意语音频道（event 省略时默认为 joined）",
       "userId": "在此填用户ID",
-      "sound": "sounds/pange.mp3",
+      "sound": "sounds/pange-join.mp3",
+      "volume": 1.6
+    },
+    {
+      "name": "某人离开语音频道（event=exited 时在其离开后播放）",
+      "userId": "在此填用户ID",
+      "event": "exited",
+      "sound": "sounds/pange-leave.mp3",
       "volume": 1.6
     },
     {

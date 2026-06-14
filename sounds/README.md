@@ -22,7 +22,7 @@ python -m pip install edge-tts
 
 # 生成音效（示例：热血男声，加速 + 提高音量）
 python -m edge_tts --voice zh-CN-YunjianNeural --rate=+40% --volume=+30% `
-  --text "注意！注意！傻逼胖哥来啦！！！" --write-media sounds/pange.mp3
+  --text "注意！注意！傻逼胖哥来啦！！！" --write-media sounds/pange-join.mp3
 ```
 
 常用中文音色：

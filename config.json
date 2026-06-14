@@ -3,9 +3,31 @@
   "volume": 1.6,
   "rules": [
     {
-      "name": "胖哥",
+      "name": "胖哥进入",
       "userId": "1407892120",
-      "sound": "sounds/pange.mp3",
+      "event": "joined",
+      "sound": "sounds/pange-join.mp3",
+      "volume": 1.6
+    },
+    {
+      "name": "胖哥离开",
+      "userId": "1407892120",
+      "event": "exited",
+      "sound": "sounds/pange-leave.mp3",
+      "volume": 1.6
+    },
+    {
+      "name": "测试-我进入",
+      "userId": "414517557",
+      "event": "joined",
+      "sound": "sounds/pange-join.mp3",
+      "volume": 1.6
+    },
+    {
+      "name": "测试-我离开",
+      "userId": "414517557",
+      "event": "exited",
+      "sound": "sounds/pange-leave.mp3",
       "volume": 1.6
     }
   ]

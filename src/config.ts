@@ -42,6 +42,9 @@ export function loadConfig(): LoadedConfig {
     if (!r.sound || typeof r.sound !== 'string') {
       throw new Error(`第 ${i + 1} 条规则缺少有效的 sound（音效文件路径）。`);
     }
+    if (r.event !== undefined && r.event !== 'joined' && r.event !== 'exited') {
+      throw new Error(`第 ${i + 1} 条规则的 event 只能是 "joined" 或 "exited"。`);
+    }
   });
 
   return { token, config: parsed };
