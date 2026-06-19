@@ -34,6 +34,9 @@ export class VoicePlayer {
   private readonly queue: PlayJob[] = [];
   private busy = false;
   private readonly ffmpegPath: string;
+  // 上一次播放完整结束（leave 之后）的时间戳，仅用于诊断：计算两次播放之间的空闲间隔，
+  // 以便排查「长时间空闲后首次播放没声音」这类冷启动嫌疑。
+  private lastPlayEndAt = 0;
 
   constructor(private readonly api: KookApi, ffmpegPath?: string) {
     this.ffmpegPath = resolveFfmpegPath(ffmpegPath);
@@ -42,6 +45,7 @@ export class VoicePlayer {
 
   enqueue(job: PlayJob): void {
     this.queue.push(job);
+    log.info(`[诊断] 入队任务：${job.label}（频道 ${job.channelId}）；当前队列长度=${this.queue.length}，处理中=${this.busy}`);
     void this.drain();
   }
 
@@ -72,13 +76,46 @@ export class VoicePlayer {
       throw new Error(`音效文件不存在：${soundPath}`);
     }
 
-    log.info(`触发：${job.label} -> 加入频道 ${job.channelId} 播放音效（通道就绪等待 ${JOIN_SETTLE_MS}ms，音量 ${job.volume}）`);
+    const idleMs = this.lastPlayEndAt > 0 ? Date.now() - this.lastPlayEndAt : -1;
+    log.info(`========== [诊断] 开始播放任务：${job.label} ==========`);
+    log.info(`[诊断] 频道=${job.channelId}，音效=${soundPath}，音量=${job.volume}`);
+    log.info(
+      `[诊断] 距上次播放结束：${idleMs < 0 ? '本进程首次播放' : `${idleMs}ms（约 ${(idleMs / 1000).toFixed(1)}s）`}` +
+        '（长时间空闲后首次播放更易遇到冷启动丢音，是排查重点）',
+    );
+
+    // === 阶段 1/4：加入语音频道 ===
+    const joinStart = Date.now();
+    log.info('[诊断] (1/4) 调用 /voice/join ...');
     const info = await this.api.joinVoice(job.channelId);
-    // 关键修复：加入后先等待语音通道在各客户端建立完成，再推流，否则会吞掉开头几个字。
+    log.info(`[诊断] (1/4) /voice/join 成功，耗时 ${Date.now() - joinStart}ms`);
+    log.info(
+      `[诊断]       媒体服务器返回：ip=${info.ip} port=${info.port} rtcp_mux=${info.rtcp_mux} ` +
+        `rtcp_port=${info.rtcp_port ?? '-'} bitrate=${info.bitrate} ssrc=${info.audio_ssrc} pt=${info.audio_pt}`,
+    );
+
+    // === 阶段 2/4：等待语音通道在各客户端就绪（热身窗口）===
+    log.info(`[诊断] (2/4) 等待通道就绪 ${JOIN_SETTLE_MS}ms（等 KOOK 把机器人音频路由到其他客户端）...`);
     await delay(JOIN_SETTLE_MS);
+
+    // === 阶段 3/4：ffmpeg 推流 ===
+    log.info('[诊断] (3/4) 开始 ffmpeg 推流 ...');
+    const streamStart = Date.now();
     await this.stream(info, soundPath, job.volume);
-    log.info('音效播放完成，离开频道。');
+    const streamMs = Date.now() - streamStart;
+    log.info(
+      `[诊断] (3/4) 推流结束，墙上耗时 ${streamMs}ms` +
+        '（用 -re 实时推流，正常应≈音效时长；明显偏短=很可能整段被丢，对照上面 ffmpeg 的 Duration / time= 判断）',
+    );
+
+    // === 阶段 4/4：离开频道 ===
+    const leaveStart = Date.now();
+    log.info('[诊断] (4/4) 调用 /voice/leave ...');
     await this.api.leaveVoice(job.channelId);
+    log.info(`[诊断] (4/4) /voice/leave 成功，耗时 ${Date.now() - leaveStart}ms`);
+
+    this.lastPlayEndAt = Date.now();
+    log.info(`========== [诊断] 任务完成：${job.label} ==========`);
   }
 
   /** 使用 ffmpeg 将音频以 opus 编码通过 RTP 推送到 KOOK 媒体服务器。 */
@@ -93,7 +130,11 @@ export class VoicePlayer {
 
     const args = [
       '-nostdin',
-      '-loglevel', 'error',
+      // 诊断期把日志级别从 error 提升到 info 并强制输出 -stats：
+      // info 会打印输入文件的 Duration、流映射、编码器；-stats 会持续打印 time= 进度。
+      // 这两项是判断「ffmpeg 是否真的把整段音频推完」的关键依据。
+      '-loglevel', 'info',
+      '-stats',
       '-re',
       '-i', soundPath,
       '-map', '0:a:0',
@@ -106,7 +147,11 @@ export class VoicePlayer {
       `[select=a:f=rtp:ssrc=${info.audio_ssrc}:payload_type=${info.audio_pt}]${rtpUrl}`,
     ];
 
+    // 打印完整命令，便于排查时直接复制到终端手动复现。
+    log.info(`[诊断] ffmpeg 命令：${this.ffmpegPath} ${args.map((a) => (/\s/.test(a) ? `'${a}'` : a)).join(' ')}`);
+
     return new Promise<void>((resolvePromise, reject) => {
+      const startedAt = Date.now();
       const child = spawn(this.ffmpegPath, args, { stdio: ['ignore', 'ignore', 'pipe'] });
       let stderr = '';
 
@@ -115,7 +160,7 @@ export class VoicePlayer {
       });
 
       const killTimer = setTimeout(() => {
-        log.warn('ffmpeg 推流超时，强制结束。');
+        log.warn('[诊断] ffmpeg 推流超时，强制结束。');
         child.kill('SIGKILL');
       }, FFMPEG_MAX_MS);
 
@@ -126,11 +171,20 @@ export class VoicePlayer {
 
       child.on('close', (code) => {
         clearTimeout(killTimer);
+        const elapsedMs = Date.now() - startedAt;
+        // 无论成功失败，都把 ffmpeg 完整输出打出来（stats 用 \r 覆盖，这里按 \r\n 一起切分）。
+        // 末尾的 time= 是「实际推流到第几秒」，对照开头的 Duration 即可判断是否推完整段。
+        const lines = stderr.split(/[\r\n]+/).map((l) => l.trim()).filter(Boolean);
+        log.info(`[诊断] ffmpeg 退出码=${code}，进程存活 ${elapsedMs}ms，完整输出（${lines.length} 行）如下：`);
+        if (lines.length > 0) {
+          log.info(lines.map((l) => `    ffmpeg | ${l}`).join('\n'));
+        } else {
+          log.info('    ffmpeg | （无输出）');
+        }
         if (code === 0) {
           resolvePromise();
         } else {
-          const tail = stderr.split('\n').filter(Boolean).slice(-4).join(' | ');
-          reject(new Error(`ffmpeg 退出码 ${code}。${tail}`));
+          reject(new Error(`ffmpeg 退出码 ${code}（详见上方完整输出）`));
         }
       });
     });
