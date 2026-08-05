@@ -5,6 +5,7 @@ import type { KookEvent } from './types.js';
 
 const HEARTBEAT_INTERVAL = 30_000;
 const PONG_TIMEOUT = 6_000;
+const CONNECT_TIMEOUT = 10_000;
 const HELLO_TIMEOUT = 6_000;
 
 // 信令类型（参见 KOOK Websocket 文档）
@@ -18,7 +19,7 @@ const SIGNAL = {
   RESUME_ACK: 6,
 } as const;
 
-type TimerName = 'heartbeatTimer' | 'pongTimer' | 'helloTimer';
+type TimerName = 'heartbeatTimer' | 'pongTimer' | 'connectTimer' | 'helloTimer';
 
 export interface KookGateway {
   on(event: 'event', listener: (d: KookEvent) => void): this;
@@ -35,6 +36,7 @@ export class KookGateway extends EventEmitter {
   private sessionId = '';
   private heartbeatTimer?: NodeJS.Timeout;
   private pongTimer?: NodeJS.Timeout;
+  private connectTimer?: NodeJS.Timeout;
   private helloTimer?: NodeJS.Timeout;
   private reconnectAttempts = 0;
   private stopped = false;
@@ -76,8 +78,14 @@ export class KookGateway extends EventEmitter {
 
       const ws = new WebSocket(url);
       this.ws = ws;
+      this.connectTimer = setTimeout(() => {
+        log.warn('WebSocket 连接超时，放弃旧会话并重新连接。');
+        this.resetSession();
+        this.reconnect(false);
+      }, CONNECT_TIMEOUT);
 
       ws.on('open', () => {
+        this.clearTimer('connectTimer');
         log.info('WebSocket 已连接，等待握手 (HELLO)...');
         this.helloTimer = setTimeout(() => {
           log.warn('等待 HELLO 超时，重新连接。');
