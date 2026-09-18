@@ -4,10 +4,10 @@
 
 当前音效：
 
-| 路径 | 来源 |
+| 路径 | 说明 |
 | --- | --- |
 | `join/pange-join.mp3` | 原加入音效 |
-| `join/pange-dream-wing.mp3` | 从提供的微信视频提取的完整音轨，不含视频，音量提高 2 dB |
+| `join/pange-dream-wing.mp3` | Dream Wing 加入音效 |
 | `leave/pange-leave.mp3` | 原离开音效 |
 | `leave/pange-leave-fast.mp3` | 原离开音效的 1.15 倍速版本，保持音高 |
 
