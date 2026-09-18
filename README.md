@@ -5,7 +5,7 @@
 - 监听 KOOK Websocket 网关的「用户加入/离开语音频道」事件（`joined_channel` / `exited_channel`）
 - 命中你配置的「用户（可选：+ 频道）+ 触发时机（进入/离开）」规则时，调用语音接口加入频道
 - 用 `ffmpeg` 把你的音效以 opus 编码通过 RTP 推流播放，播完自动离开
-- 支持多条规则、每条规则独立音效与音量、可选触发冷却
+- 支持多条规则、每条规则按权重随机选择音效、独立音量、可选触发冷却
 - 串行队列：同一时间只在一个频道播放，多人同时进入会自动排队逐个播放
 - 加入后先等语音通道在各端建立完成再推流，避免开头几个字被吞
 
@@ -78,14 +78,20 @@ KOOK_BOT_TOKEN=你的机器人Token
       "name": "胖哥进入",
       "userId": "1407892120",
       "event": "joined",
-      "sound": "sounds/pange-join.mp3",
+      "sounds": [
+        { "sound": "sounds/join/pange-join.mp3", "weight": 50 },
+        { "sound": "sounds/join/pange-dream-wing.mp3", "weight": 50 }
+      ],
       "volume": 1.6
     },
     {
       "name": "胖哥离开",
       "userId": "1407892120",
       "event": "exited",
-      "sound": "sounds/pange-leave.mp3",
+      "sounds": [
+        { "sound": "sounds/leave/pange-leave.mp3", "weight": 50 },
+        { "sound": "sounds/leave/pange-leave-fast.mp3", "weight": 50 }
+      ],
       "volume": 1.6
     }
   ]
@@ -99,13 +105,18 @@ KOOK_BOT_TOKEN=你的机器人Token
 | `userId` | 是 | 目标用户的 ID |
 | `channelId` | 否 | 目标语音频道 ID；**留空 / 不写** 表示该用户进入任意语音频道都会触发 |
 | `event` | 否 | 触发时机：`joined`（加入，默认）或 `exited`（离开）；同一人可分别配置进/出两条规则 |
-| `sound` | 是 | 音效文件路径，相对项目根目录，例如 `sounds/special.mp3` |
+| `sound` | 二选一 | 固定音效路径；与 `sounds` 不能同时配置，兼容旧规则 |
+| `sounds` | 二选一 | 非空数组，每项为 `{ "sound": "sounds/join/example.mp3", "weight": 20 }`；权重必须是有限非负数，且至少一个大于 0 |
 | `name` | 否 | 仅用于日志显示的名称 |
 | `volume` | 否 | 该规则单独音量，`1` 为原始音量，`0.8` 更轻，`1.5` 更响 |
 | `cooldownMs` | 否 | 顶层字段，同一用户在同一频道两次触发的最小间隔（毫秒），`0` 表示无冷却；默认 8000 |
 | `volume`（顶层） | 否 | 全局默认音量，默认 `1.0` |
 
-最后，把你的音效文件放进 `sounds/` 目录。你也可以用免费的 `edge-tts` 在本地生成（含东北话、陕西话、粤语等方言音色），详见 [sounds/README.md](sounds/README.md)。
+每次通过冷却检查后，独立按 `weight / 总权重` 选择一个音效。权重 `20 / 30 / 50` 对应 `20% / 30% / 50%`，也可以写成 `2 / 3 / 5`，无需合计为 100。短期内可能连续抽到同一个音效，并不保证每十次严格按比例播放。
+
+`weight: 0` 表示停用该音效，不需要删除条目。要固定播放某个音效，将它的权重设为 `100`，其他音效设为 `0` 即可。所有权重都为 `0` 时会在启动时报错。
+
+加入音效放在 `sounds/join/`，离开音效放在 `sounds/leave/`。新增文件后，需要把路径和权重添加到对应规则的 `sounds` 数组并重启机器人；不会自动扫描目录。当前两组各有两个音效，默认各占 50%。你也可以用免费的 `edge-tts` 在本地生成，详见 [sounds/README.md](sounds/README.md)。
 
 ---
 
@@ -115,6 +126,12 @@ KOOK_BOT_TOKEN=你的机器人Token
 
 ```powershell
 npm start
+```
+
+运行本地权重选择与配置校验测试（不连接 KOOK）：
+
+```powershell
+npm test
 ```
 
 看到日志 `机器人已启动，正在监听语音频道加入/离开事件。` 即表示成功。让目标用户进入语音频道，机器人会自动加入并播放音效。按 `Ctrl+C` 退出。
@@ -199,14 +216,14 @@ git reset --hard origin/main
       "name": "测试-我进入",
       "userId": "414517557",
       "event": "joined",
-      "sound": "sounds/pange-join.mp3",
+      "sound": "sounds/join/pange-join.mp3",
       "volume": 1.6
     },
     {
       "name": "测试-我离开",
       "userId": "414517557",
       "event": "exited",
-      "sound": "sounds/pange-leave.mp3",
+      "sound": "sounds/leave/pange-leave.mp3",
       "volume": 1.6
     }
 ```
@@ -239,6 +256,7 @@ git reset --hard origin/main
 | --- | --- |
 | [src/index.ts](src/index.ts) | 入口：装配各模块、匹配规则、冷却控制 |
 | [src/config.ts](src/config.ts) | 读取并校验 `.env` 与 `config.json` |
+| [src/sounds.ts](src/sounds.ts) | 按规则权重随机选择本次播放的音效 |
 | [src/kook-api.ts](src/kook-api.ts) | KOOK HTTP 接口封装（网关地址、语音加入/离开） |
 | [src/gateway.ts](src/gateway.ts) | Websocket 网关：握手、心跳、断线重连、resume |
 | [src/voice-player.ts](src/voice-player.ts) | 串行播放队列、加入后等待通道就绪、ffmpeg 推流 |

@@ -36,11 +36,33 @@ export function loadConfig(): LoadedConfig {
   }
 
   parsed.rules.forEach((r, i) => {
-    if (!r.userId || typeof r.userId !== 'string') {
+    if (!r || !r.userId || typeof r.userId !== 'string') {
       throw new Error(`第 ${i + 1} 条规则缺少有效的 userId。`);
     }
-    if (!r.sound || typeof r.sound !== 'string') {
-      throw new Error(`第 ${i + 1} 条规则缺少有效的 sound（音效文件路径）。`);
+    if (r.sounds !== undefined) {
+      if (r.sound !== undefined) {
+        throw new Error(`第 ${i + 1} 条规则不能同时配置 sound 和 sounds。`);
+      }
+      if (!Array.isArray(r.sounds) || r.sounds.length === 0) {
+        throw new Error(`第 ${i + 1} 条规则的 sounds 必须是非空数组。`);
+      }
+      for (const entry of r.sounds) {
+        if (!entry || typeof entry.sound !== 'string' || !entry.sound.trim()) {
+          throw new Error(`第 ${i + 1} 条规则的 sounds 缺少有效的 sound 路径。`);
+        }
+        if (!Number.isFinite(entry.weight) || entry.weight < 0) {
+          throw new Error(`第 ${i + 1} 条规则的 sounds 中 weight 必须是有限非负数。`);
+        }
+      }
+      const totalWeight = r.sounds.reduce((total, entry) => total + entry.weight, 0);
+      if (!Number.isFinite(totalWeight)) {
+        throw new Error(`第 ${i + 1} 条规则的 sounds 总 weight 超出有效范围。`);
+      }
+      if (totalWeight === 0) {
+        throw new Error(`第 ${i + 1} 条规则的 sounds 至少需要一个 weight 大于 0 的音效。`);
+      }
+    } else if (typeof r.sound !== 'string' || !r.sound.trim()) {
+      throw new Error(`第 ${i + 1} 条规则缺少有效的 sound 或 sounds。`);
     }
     if (r.event !== undefined && r.event !== 'joined' && r.event !== 'exited') {
       throw new Error(`第 ${i + 1} 条规则的 event 只能是 "joined" 或 "exited"。`);

@@ -6,14 +6,40 @@
       "name": "胖哥进入",
       "userId": "1407892120",
       "event": "joined",
-      "sound": "sounds/pange-join.mp3",
+      "sounds": [
+        { "sound": "sounds/join/pange-join.mp3", "weight": 0 },
+        { "sound": "sounds/join/pange-dream-wing.mp3", "weight": 100 }
+      ],
       "volume": 1.6
     },
     {
       "name": "胖哥离开",
       "userId": "1407892120",
       "event": "exited",
-      "sound": "sounds/pange-leave.mp3",
+      "sounds": [
+        { "sound": "sounds/leave/pange-leave.mp3", "weight": 50 },
+        { "sound": "sounds/leave/pange-leave-fast.mp3", "weight": 50 }
+      ],
+      "volume": 1.6
+    },
+    {
+      "name": "测试-我进入",
+      "userId": "414517557",
+      "event": "joined",
+      "sounds": [
+        { "sound": "sounds/join/pange-join.mp3", "weight": 0 },
+        { "sound": "sounds/join/pange-dream-wing.mp3", "weight": 100 }
+      ],
+      "volume": 1.6
+    },
+    {
+      "name": "测试-我离开",
+      "userId": "414517557",
+      "event": "exited",
+      "sounds": [
+        { "sound": "sounds/leave/pange-leave.mp3", "weight": 50 },
+        { "sound": "sounds/leave/pange-leave-fast.mp3", "weight": 50 }
+      ],
       "volume": 1.6
     }
   ]

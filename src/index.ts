@@ -3,6 +3,7 @@ import { KookApi } from './kook-api.js';
 import { KookGateway } from './gateway.js';
 import { VoicePlayer } from './voice-player.js';
 import { log } from './logger.js';
+import { selectSound } from './sounds.js';
 import type { KookEvent, Rule, TriggerEvent } from './types.js';
 
 // KOOK 系统事件名 -> 内部触发时机。
@@ -23,7 +24,10 @@ async function main(): Promise<void> {
   log.info(`已加载 ${config.rules.length} 条规则：`);
   for (const r of config.rules) {
     const when = (r.event ?? 'joined') === 'exited' ? '离开' : '加入';
-    log.info(`  · ${r.name ?? r.userId} ${when} ${r.channelId ?? '任意语音频道'} -> ${r.sound}`);
+    const sounds = r.sounds
+      ? r.sounds.map((entry) => `${entry.sound} (weight=${entry.weight})`).join(', ')
+      : r.sound;
+    log.info(`  · ${r.name ?? r.userId} ${when} ${r.channelId ?? '任意语音频道'} -> ${sounds}`);
   }
 
   const gateway = new KookGateway(() => api.getGatewayUrl());
@@ -54,7 +58,7 @@ async function main(): Promise<void> {
 
     player.enqueue({
       channelId,
-      sound: rule.sound,
+      sound: selectSound(rule),
       volume: rule.volume ?? defaultVolume,
       label: rule.name ?? userId,
     });

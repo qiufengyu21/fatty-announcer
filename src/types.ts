@@ -1,6 +1,11 @@
 /** 触发时机：用户「加入」(joined) 还是「离开」(exited) 语音频道。 */
 export type TriggerEvent = 'joined' | 'exited';
 
+export interface WeightedSound {
+  sound: string;
+  weight: number;
+}
+
 /** 一条触发规则：当某用户进入/离开（指定）语音频道时，播放某个音效。 */
 export interface Rule {
   /** 目标用户的 user_id（必填）。 */
@@ -10,7 +15,8 @@ export interface Rule {
   /** 触发时机：joined（加入，默认）或 exited（离开）。 */
   event?: TriggerEvent;
   /** 音效文件路径（相对于项目根目录或绝对路径）。 */
-  sound: string;
+  sound?: string;
+  sounds?: WeightedSound[];
   /** 可选：仅用于日志显示的名称。 */
   name?: string;
   /** 可选：该规则单独的音量（0~2，1 为原始音量）。 */

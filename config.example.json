@@ -5,21 +5,27 @@
     {
       "name": "某人进入任意语音频道（event 省略时默认为 joined）",
       "userId": "在此填用户ID",
-      "sound": "sounds/pange-join.mp3",
+      "sounds": [
+        { "sound": "sounds/join/pange-join.mp3", "weight": 50 },
+        { "sound": "sounds/join/pange-dream-wing.mp3", "weight": 50 }
+      ],
       "volume": 1.6
     },
     {
       "name": "某人离开语音频道（event=exited 时在其离开后播放）",
       "userId": "在此填用户ID",
       "event": "exited",
-      "sound": "sounds/pange-leave.mp3",
+      "sounds": [
+        { "sound": "sounds/leave/pange-leave.mp3", "weight": 50 },
+        { "sound": "sounds/leave/pange-leave-fast.mp3", "weight": 50 }
+      ],
       "volume": 1.6
     },
     {
       "name": "另一个人（仅在指定频道触发，使用独立音效与音量）",
       "userId": "在此填另一个用户ID",
       "channelId": "在此填语音频道ID（删掉本行=任意频道都触发）",
-      "sound": "sounds/another.mp3",
+      "sound": "sounds/join/pange-join.mp3",
       "volume": 1.4
     }
   ]
