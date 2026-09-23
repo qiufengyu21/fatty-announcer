@@ -8,7 +8,7 @@
 | --- | --- |
 | `join/pange-join.mp3` | 原加入音效 |
 | `join/pange-dream-wing.mp3` | Dream Wing 加入音效 |
-| `join/yao-old-beijing.mp3` | 照耀加入音效（视频前 9 秒，音量已降低约 19 dB，比其他音效明显更轻） |
+| `join/yao-old-beijing.mp3` | 照耀加入音效（视频前 9 秒，音量已降低约 21 dB，比其他音效明显更轻） |
 | `leave/pange-leave.mp3` | 原离开音效 |
 | `leave/pange-leave-fast.mp3` | 原离开音效的 1.15 倍速版本，保持音高 |
 
