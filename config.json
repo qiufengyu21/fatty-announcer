@@ -13,6 +13,13 @@
       "volume": 1.6
     },
     {
+      "name": "照耀进入",
+      "userId": "2262413188",
+      "event": "joined",
+      "sound": "sounds/join/yao-99cheng.mp3",
+      "volume": 1.6
+    },
+    {
       "name": "胖哥离开",
       "userId": "1407892120",
       "event": "exited",
