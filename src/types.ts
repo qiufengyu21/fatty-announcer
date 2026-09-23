@@ -32,6 +32,10 @@ export interface AppConfig {
   volume?: number;
   /** 可选：自定义 ffmpeg 路径，优先级低于环境变量 FFMPEG_PATH。 */
   ffmpegPath?: string;
+  /** 可选：可使用 .test 测试命令的管理员 user_id 列表。 */
+  admins?: string[];
+  /** 可选：.test 命令使用的用户简称，例如 { "pg": "1407892120" }。 */
+  aliases?: Record<string, string>;
 }
 
 /** /api/v3/voice/join 接口返回的数据。 */
@@ -54,9 +58,10 @@ export interface KookEvent {
   author_id: string;
   content: string;
   extra: {
-    /** 系统事件的具体类型，例如 joined_channel。 */
-    type: string;
-    body: Record<string, unknown>;
+    /** 系统事件为具体类型字符串（例如 joined_channel）；文字消息为消息类型数字。 */
+    type: string | number;
+    body?: Record<string, unknown>;
+    author?: { id: string; bot?: boolean };
   };
   msg_id: string;
   msg_timestamp: number;

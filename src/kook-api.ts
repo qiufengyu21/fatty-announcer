@@ -59,4 +59,17 @@ export class KookApi {
       body: JSON.stringify({ channel_id: channelId }),
     });
   }
+
+  /** 发送 KMarkdown 频道消息；传入 tempTargetId 时为仅该用户可见的临时消息。 */
+  async sendMessage(channelId: string, content: string, options: { tempTargetId?: string } = {}): Promise<void> {
+    await this.request('/message/create', {
+      method: 'POST',
+      body: JSON.stringify({
+        type: 9,
+        target_id: channelId,
+        content,
+        ...(options.tempTargetId ? { temp_target_id: options.tempTargetId } : {}),
+      }),
+    });
+  }
 }

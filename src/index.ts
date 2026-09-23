@@ -4,6 +4,7 @@ import { KookGateway } from './gateway.js';
 import { VoicePlayer } from './voice-player.js';
 import { log } from './logger.js';
 import { selectSound } from './sounds.js';
+import { TestCommand } from './commands.js';
 import type { KookEvent, Rule, TriggerEvent } from './types.js';
 
 // KOOK 系统事件名 -> 内部触发时机。
@@ -30,21 +31,33 @@ async function main(): Promise<void> {
     log.info(`  · ${r.name ?? r.userId} ${when} ${r.channelId ?? '任意语音频道'} -> ${sounds}`);
   }
 
+  const admins = config.admins ?? [];
+  const testCommand = new TestCommand({ admins, aliases: config.aliases ?? {}, api });
+  if (admins.length > 0) {
+    log.info(`测试命令已对管理员开放：${admins.join(', ')}（在文字频道发送 .test <简称>）`);
+  }
+
   const gateway = new KookGateway(() => api.getGatewayUrl());
 
   gateway.on('event', (d: KookEvent) => {
-    // 仅关心「用户加入/离开语音频道」系统事件
-    if (!d || d.type !== 255) return;
+    if (!d) return;
+    // 非系统事件只可能是管理员的 .test 命令；其余仅关心「用户加入/离开语音频道」系统事件
+    if (d.type !== 255) {
+      void testCommand.handle(d);
+      return;
+    }
     const trigger = EVENT_TRIGGERS[d.extra?.type];
     if (!trigger) return;
 
     const userId = String(d.extra.body?.user_id ?? '');
     const channelId = String(d.extra.body?.channel_id ?? '');
+    const ruleUserId = testCommand.effectiveUserId(userId);
     // 同时打印出 user_id / channel_id，方便你查找并填写到 config.json
     const action = trigger === 'exited' ? '离开' : '加入';
-    log.info(`用户${action}语音频道：user_id=${userId} channel_id=${channelId}`);
+    const impersonating = ruleUserId === userId ? '' : `（.test 模拟 ${ruleUserId}）`;
+    log.info(`用户${action}语音频道：user_id=${userId} channel_id=${channelId}${impersonating}`);
 
-    const rule = matchRule(config.rules, userId, channelId, trigger);
+    const rule = matchRule(config.rules, ruleUserId, channelId, trigger);
     if (!rule) return;
 
     // 冷却键含触发时机，避免同一用户的「加入」与「离开」规则互相占用冷却。

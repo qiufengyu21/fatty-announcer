@@ -69,5 +69,32 @@ export function loadConfig(): LoadedConfig {
     }
   });
 
+  if (
+    parsed.admins !== undefined &&
+    (!Array.isArray(parsed.admins) || parsed.admins.some((id) => typeof id !== 'string' || !id.trim()))
+  ) {
+    throw new Error('admins 必须是由 user_id 字符串组成的数组。');
+  }
+
+  if (parsed.aliases !== undefined) {
+    if (!parsed.aliases || typeof parsed.aliases !== 'object' || Array.isArray(parsed.aliases)) {
+      throw new Error('aliases 必须是 { "简称": "user_id" } 形式的对象。');
+    }
+    const seen = new Set<string>();
+    for (const [alias, userId] of Object.entries(parsed.aliases)) {
+      const key = alias.toLowerCase();
+      if (!/^[a-z][a-z0-9_]*$/.test(key)) {
+        throw new Error(`aliases 中的简称 "${alias}" 只能包含英文字母、数字和下划线，且以字母开头。`);
+      }
+      if (seen.has(key)) {
+        throw new Error(`aliases 中的简称 "${alias}" 重复（不区分大小写）。`);
+      }
+      seen.add(key);
+      if (typeof userId !== 'string' || !userId.trim()) {
+        throw new Error(`aliases 中简称 "${alias}" 对应的 user_id 无效。`);
+      }
+    }
+  }
+
   return { token, config: parsed };
 }

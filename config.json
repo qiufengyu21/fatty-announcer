@@ -1,6 +1,8 @@
 {
   "cooldownMs": 0,
   "volume": 1.6,
+  "admins": ["414517557"],
+  "aliases": { "pg": "1407892120", "zy": "2262413188" },
   "rules": [
     {
       "name": "胖哥进入",

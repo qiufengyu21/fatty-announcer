@@ -73,6 +73,8 @@ KOOK_BOT_TOKEN=你的机器人Token
 {
   "cooldownMs": 0,
   "volume": 1.6,
+  "admins": ["414517557"],
+  "aliases": { "pg": "1407892120" },
   "rules": [
     {
       "name": "胖哥进入",
@@ -111,6 +113,8 @@ KOOK_BOT_TOKEN=你的机器人Token
 | `volume` | 否 | 该规则单独音量，`1` 为原始音量，`0.8` 更轻，`1.5` 更响 |
 | `cooldownMs` | 否 | 顶层字段，同一用户在同一频道两次触发的最小间隔（毫秒），`0` 表示无冷却；默认 8000 |
 | `volume`（顶层） | 否 | 全局默认音量，默认 `1.0` |
+| `admins`（顶层） | 否 | 可使用 `.test` 测试命令的 user_id 数组，见「测试新功能」 |
+| `aliases`（顶层） | 否 | `.test` 命令用的用户简称，形如 `{ "pg": "1407892120" }`；简称只能含英文字母、数字、下划线，且以字母开头 |
 
 每次通过冷却检查后，独立按 `weight / 总权重` 选择一个音效。权重 `20 / 30 / 50` 对应 `20% / 30% / 50%`，也可以写成 `2 / 3 / 5`，无需合计为 100。短期内可能连续抽到同一个音效，并不保证每十次严格按比例播放。
 
@@ -128,7 +132,7 @@ KOOK_BOT_TOKEN=你的机器人Token
 npm start
 ```
 
-运行本地权重选择与配置校验测试（不连接 KOOK）：
+运行本地权重选择、配置校验与 `.test` 命令测试（不连接 KOOK）：
 
 ```powershell
 npm test
@@ -207,26 +211,20 @@ git reset --hard origin/main
 > `git reset --hard` 会丢弃所有未提交的本地改动，执行前务必先 `git status` 确认干净。
 > 想一劳永逸避免分叉提示，可设一次默认：`git config pull.ff only`。
 
-### 测试新功能（临时规则）
+### 测试新功能（.test 命令）
 
-`config.json` 是 JSON 格式、**不支持注释**，所以测试规则没法“注释保留”在文件里。需要测试时，把下面这两条规则临时粘进 `config.json` 的 `rules` 数组（测试账号 `414517557`），重启服务即可用自己的账号触发进/出音效；测完删掉这两条再重启：
+在 `config.json` 里配置好 `admins`（你自己的 user_id）和 `aliases`（用户简称）后，无需再改配置或重启：
 
-```json
-    {
-      "name": "测试-我进入",
-      "userId": "414517557",
-      "event": "joined",
-      "sound": "sounds/join/pange-join.mp3",
-      "volume": 1.6
-    },
-    {
-      "name": "测试-我离开",
-      "userId": "414517557",
-      "event": "exited",
-      "sound": "sounds/leave/pange-leave.mp3",
-      "volume": 1.6
-    }
-```
+1. 在机器人所在服务器的任意文字频道发送 `.test pg`（或 `.test zy` 等）。
+2. 机器人会回复一条**仅你可见**的临时消息确认生效。
+3. 接下来 **3 分钟**内，你自己进入/离开语音频道时，会被当作 pg，触发 pg 的进/出音效。
+
+说明：
+
+- 只有 `admins` 里的用户发的 `.test` 才会被处理，其他人发送会被忽略。
+- 再次发送 `.test <简称>` 会切换目标并重新计时 3 分钟；3 分钟后自动恢复，重启服务也会清除。
+- 简称不区分大小写；发送 `.test` 或写错简称时，会回复可用的简称列表。
+- 模拟期间日志会显示 `用户加入语音频道：user_id=你的ID ...（.test 模拟 1407892120）`。
 
 > 提示：`config.json` 不需要改代码、不参与编译，改完只要 `sudo systemctl restart kook-bot` 重启即可生效，无需 `npm run build`。
 
@@ -255,9 +253,10 @@ git reset --hard origin/main
 | 文件 | 作用 |
 | --- | --- |
 | [src/index.ts](src/index.ts) | 入口：装配各模块、匹配规则、冷却控制 |
+| [src/commands.ts](src/commands.ts) | 管理员 `.test <简称>` 命令：3 分钟内把管理员当作指定用户 |
 | [src/config.ts](src/config.ts) | 读取并校验 `.env` 与 `config.json` |
 | [src/sounds.ts](src/sounds.ts) | 按规则权重随机选择本次播放的音效 |
-| [src/kook-api.ts](src/kook-api.ts) | KOOK HTTP 接口封装（网关地址、语音加入/离开） |
+| [src/kook-api.ts](src/kook-api.ts) | KOOK HTTP 接口封装（网关地址、语音加入/离开、发送消息） |
 | [src/gateway.ts](src/gateway.ts) | Websocket 网关：握手、心跳、断线重连、resume |
 | [src/voice-player.ts](src/voice-player.ts) | 串行播放队列、加入后等待通道就绪、ffmpeg 推流 |
 | [src/ffmpeg.ts](src/ffmpeg.ts) | 解析 ffmpeg 可执行文件路径 |
@@ -281,6 +280,10 @@ git reset --hard origin/main
 **Q：加入语音失败 / 偶发报错？**
 - KOOK 限制同一时间只能加入一个语音房间，离开后需等待 2~3 秒再加入（本项目已自动处理）。
 - 确认机器人在该语音频道有「连接语音/说话」权限。
+
+**Q：发送 `.test pg` 没有收到回复？**
+- 确认你的 user_id 在 `admins` 里，并且是在服务器的文字频道（不是私信）里发送的。
+- 查看日志是否有 `[测试命令]`：有的话说明命令已生效，只是回复失败（通常是机器人在该频道没有发送消息的权限），直接去进出语音频道测试即可。
 
 **Q：能同时监听多个用户 / 多个频道吗？两人同时进来会怎样？**
 - 可以，在 `rules` 数组里添加多条规则即可。机器人是单一账号，同一时间只能在一个语音频道；多个触发会自动排队、逐个播放，不会冲突也不会丢，只是靠后的会稍晚一点。

@@ -1,6 +1,8 @@
 {
   "cooldownMs": 0,
   "volume": 1.6,
+  "admins": ["在此填你自己的用户ID（可用 .test 测试；不需要可删掉本行）"],
+  "aliases": { "pg": "在此填用户ID" },
   "rules": [
     {
       "name": "某人进入任意语音频道（event 省略时默认为 joined）",
