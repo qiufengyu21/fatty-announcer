@@ -18,8 +18,7 @@ const LEAVE_COOLDOWN_MS = 2500;
 // ffmpeg 推流的最大时长保护，防止异常情况下进程挂死。
 const FFMPEG_MAX_MS = 120_000;
 // 加入频道后，先等 KOOK 把机器人的语音通道路由到其他客户端，再开始推流。
-// 这是真实的墙上时钟等待，才是修复「开头被吞」的关键——在音频里垫静音没用，
-// 因为 ffmpeg 会把 adelay 静音瞬间灌完，并不占用真实时间。
+// 这是真实的墙上时钟等待，才是修复「开头被吞」的关键——在音频里垫静音代替不了它。
 // 音效文案已重复 x2 作为兜底，故这里只保留 1.5 秒等待：扛住绝大多数吞音窗口，
 // 剩下的零头由第二遍重复覆盖；既比 2 秒响应更快，又不至于归零后在坏网络下连第二遍也被吞。
 const JOIN_SETTLE_MS = 1500;
@@ -125,8 +124,10 @@ export class VoicePlayer {
       ? `rtp://${info.ip}:${info.port}`
       : `rtp://${info.ip}:${info.port}?rtcpport=${info.rtcp_port}`;
 
-    // 先垫静音再调音量：adelay 在头部插入静音，volume 放大响度。
-    const filter = `adelay=${LEAD_IN_SILENCE_MS}|${LEAD_IN_SILENCE_MS},volume=${volume}`;
+    // adelay 在头部插入静音，volume 放大响度，arealtime 按真实时间节流输出。
+    // -re 只限制读取输入的速度：adelay 生成的静音以及 ffmpeg 默认的 0.5 秒初始突发
+    // 会在开头瞬间推出约 0.75 秒音频，客户端抖动缓冲为追赶延迟会加速播放，听起来像「快进」。
+    const filter = `adelay=${LEAD_IN_SILENCE_MS}|${LEAD_IN_SILENCE_MS},volume=${volume},arealtime`;
 
     const args = [
       '-nostdin',
